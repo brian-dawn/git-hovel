@@ -7,12 +7,15 @@ use axum::{
     Form, Json, Router,
 };
 use dotenv::dotenv;
+use errors::HovelError;
 use maud::{html, Markup};
 use serde::{Deserialize, Serialize};
 use sqlx;
 use std::{error::Error, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tracing_subscriber::util::SubscriberInitExt;
+
+pub mod errors;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -28,14 +31,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     sqlx::migrate!().run(&pool).await?;
 
     // Insert an example repo.
-    sqlx::query!(
-        r#"
-INSERT INTO repository(name) VALUES (?1)
-"#,
-        "test"
-    )
-    .execute(&pool)
-    .await?;
+    sqlx::query!(r#"INSERT INTO repository(name) VALUES (?1)"#, "test")
+        .execute(&pool)
+        .await?;
 
     let app = Router::new()
         // `GET /` goes to `root`
@@ -52,22 +50,16 @@ INSERT INTO repository(name) VALUES (?1)
     Ok(())
 }
 
-async fn root(
-    pool: State<sqlx::SqlitePool>,
-    ) -> String {
-    let repos = sqlx::query!(
-        r#"
-SELECT id, name FROM repository
-"#,
-    )
-    .fetch_all(&*pool)
-    .await
-    .unwrap();
+async fn root(pool: State<sqlx::SqlitePool>) -> Result<String, HovelError> {
+    let repos = sqlx::query!(r#"SELECT id, name FROM repository"#,)
+        .fetch_all(&*pool)
+        .await
+        .map_err(|_| HovelError::InternalServerError)?;
 
     let mut html = String::new();
     for repo in repos {
-        html.push_str(&format!("<li>{} - {}</li>", repo.id ,repo.name));
+        html.push_str(&format!("<li>{} - {}</li>", repo.id, repo.name));
     }
 
-    html
+    Ok(html)
 }

@@ -15,3 +15,4 @@ tracing = "0.1.40"
 maud = { version = "*", features = ["axum"]}
 sqlx = { version = "0.7", features = [ "runtime-tokio", "sqlite" ] }
 dotenv = "0.15.0"
+thiserror = "1.0.50"
