@@ -9,6 +9,7 @@ use dotenv::dotenv;
 
 use errors::HovelError;
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 
 use std::{error::Error, net::SocketAddr};
 
@@ -21,24 +22,37 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
     dotenv().ok();
 
-    let http_server = run_http_server();
-    let ssh_server = ssh::run_server();
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::memory:".to_string());
+
+    let pool = sqlx::sqlite::SqlitePool::connect(&database_url).await?;
+
+    let http_server = run_http_server(pool.clone());
+    let ssh_server = ssh::run_server(pool);
 
     tokio::try_join!(http_server, ssh_server)?;
 
     Ok(())
 }
 
-async fn run_http_server() -> Result<(), Box<dyn Error + Send + Sync>> {
-    let database_url =
-        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::memory:".to_string());
-
-    let pool = sqlx::sqlite::SqlitePool::connect(&database_url).await?;
-
+async fn run_http_server(pool: SqlitePool) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Embed the migrations directory into the binary.
     sqlx::migrate!().run(&pool).await?;
 
-    // crate::crud::create_repository(&pool, "Test", None, "some-test-url").await?;
+    // Clear the database.
+    sqlx::query!("DELETE FROM repository")
+        .execute(&pool)
+        .await?;
+    sqlx::query!("DELETE FROM pubkey").execute(&pool).await?;
+    sqlx::query!("DELETE FROM user").execute(&pool).await?;
+
+    // Best effort make some stuff
+    let repo = crud::create_repository(&pool, "Test", None, "some-test-url").await?;
+    let user = crud::create_user(&pool, "brian", "norm@norm.com").await?;
+
+    let pubkey = std::fs::read_to_string("/home/brian/.ssh/id_rsa.pub").unwrap();
+    tracing::info!("pubkey: {}", pubkey);
+    crud::add_pubkey(&pool, &user.id, &pubkey).await?;
 
     // Insert an example repo.
 

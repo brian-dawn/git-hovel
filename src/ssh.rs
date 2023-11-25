@@ -5,11 +5,12 @@ use async_trait::async_trait;
 use russh::server::{Msg, Session};
 use russh::*;
 use russh_keys::*;
+use sqlx::SqlitePool;
 use tokio::sync::Mutex;
 
 use crate::errors::HovelError;
 
-pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
+pub async fn run_server(pool: SqlitePool) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
     let keypair = russh_keys::key::KeyPair::generate_ed25519();
 
     let config = russh::server::Config {
@@ -21,6 +22,7 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Sync + Send>
     let sh = Server {
         clients: Arc::new(Mutex::new(HashMap::new())),
         id: 0,
+        pool,
     };
 
     tracing::info!("Starting SSH server on port 2222");
@@ -34,6 +36,7 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Sync + Send>
 struct Server {
     clients: Arc<Mutex<HashMap<(usize, ChannelId), russh::server::Handle>>>,
     id: usize,
+    pool: SqlitePool,
 }
 
 impl Server {
@@ -78,10 +81,30 @@ impl server::Handler for Server {
         user: &str,
         public_key: &key::PublicKey,
     ) -> Result<(Self, server::Auth), Self::Error> {
+        let fingerprint = public_key.fingerprint();
+        tracing::info!(
+            "Authenticating offered with public key {} for user {}",
+            fingerprint,
+            user
+        );
 
-        let first_chars = public_key.fingerprint();
-        tracing::info!("Authenticating offered with public key {} for user {}", first_chars, user);
-        Ok((self, server::Auth::Accept))
+        let key = public_key.public_key_base64();
+
+        tracing::info!("pubkey: {}", key);
+
+        let user = crate::crud::user_id_from_pubkey(&self.pool, &key).await;
+
+        if let Ok(user) = user {
+            tracing::info!("Found user: {:?}", user);
+            return Ok((self, server::Auth::Accept));
+        }
+        tracing::info!("User not found");
+        Ok((
+            self,
+            server::Auth::Reject {
+                proceed_with_methods: None,
+            },
+        ))
     }
     async fn auth_publickey(
         self,
