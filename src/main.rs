@@ -1,19 +1,16 @@
-use askama::Template;
+
 use axum::{
-    extract::{Query, State},
-    http::StatusCode,
-    response::{Html, IntoResponse},
-    routing::{get, post},
-    Form, Json, Router,
+    extract::{State},
+    routing::{get}, Router,
 };
 use dotenv::dotenv;
 use errors::HovelError;
-use maud::{html, Markup};
-use serde::{Deserialize, Serialize};
-use sqlx;
-use std::{error::Error, net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
-use tracing_subscriber::util::SubscriberInitExt;
+
+
+
+use std::{error::Error, net::SocketAddr};
+
+
 
 pub mod errors;
 
