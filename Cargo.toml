@@ -13,3 +13,5 @@ serde = { version = "1", features = ["derive"] }
 tracing-subscriber = "0.3.17"
 tracing = "0.1.40"
 maud = { version = "*", features = ["axum"]}
+sqlx = { version = "0.7", features = [ "runtime-tokio", "sqlite" ] }
+dotenv = "0.15.0"
