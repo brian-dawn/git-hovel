@@ -21,8 +21,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Embed the migrations directory into the binary.
     sqlx::migrate!().run(&pool).await?;
 
+    crate::crud::create_repository(&pool, "Test", None, "some-test-url").await?;
+
     // Insert an example repo.
-    crud::create_repository()
 
     let app = Router::new()
         // `GET /` goes to `root`
@@ -48,8 +49,7 @@ struct RepositoryResponse {
 async fn root(pool: State<sqlx::SqlitePool>) -> Result<String, HovelError> {
     let repos = sqlx::query!(r#"SELECT id, name FROM repository"#,)
         .fetch_all(&*pool)
-        .await
-        .map_err(|_| HovelError::InternalServerError)?;
+        .await?;
 
     let mut html = String::new();
     for repo in repos {

@@ -11,18 +11,26 @@ pub enum HovelError {
     BadRequest,
 
     #[error("Internal Server Error")]
-    InternalServerError,
+    InternalServerError(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl IntoResponse for HovelError {
     fn into_response(self) -> Response {
-        let status = match self {
+        let status = match &self {
             HovelError::NotFound => StatusCode::NOT_FOUND,
             HovelError::BadRequest => StatusCode::BAD_REQUEST,
-            HovelError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+            HovelError::InternalServerError(e) => StatusCode::INTERNAL_SERVER_ERROR,
             // Handle other errors
         };
 
-        (status, self.to_string()).into_response()
+        tracing::error!("{:?}", &self);
+
+        (status, "oops").into_response()
+    }
+}
+
+impl From<sqlx::Error> for HovelError {
+    fn from(e: sqlx::Error) -> Self {
+        Self::InternalServerError(Box::new(e))
     }
 }

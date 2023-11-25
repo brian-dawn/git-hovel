@@ -13,10 +13,8 @@ pub struct Repository {
 }
 
 /// Generate a random UUID v4 as a hex string.
-fn uuid_v4_hex() -> String {
-    let uuid = uuid::Uuid::new_v4();
-    let hex = uuid.to_string();
-    hex
+fn uuid_v4_hex() -> Uuid {
+    uuid::Uuid::new_v4()
 }
 
 pub async fn create_repository(
@@ -38,8 +36,7 @@ pub async fn create_repository(
         slug
     )
     .execute(pool)
-    .await
-    .map_err(|_| HovelError::InternalServerError)?;
+    .await?;
 
     let found = sqlx::query_as!(
         Repository,
@@ -51,8 +48,7 @@ pub async fn create_repository(
         id
     )
     .fetch_one(pool)
-    .await
-    .map_err(|_| HovelError::InternalServerError)?;
+    .await?;
 
     Ok(found)
 }
@@ -67,8 +63,7 @@ pub async fn list_repositories(pool: &SqlitePool) -> Result<Vec<Repository>, Hov
         "#,
     )
     .fetch_all(pool)
-    .await
-    .map_err(|_| HovelError::InternalServerError)?;
+    .await?;
 
     Ok(repos)
 }
