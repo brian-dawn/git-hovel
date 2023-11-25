@@ -14,12 +14,22 @@ use std::{error::Error, net::SocketAddr};
 
 pub mod crud;
 pub mod errors;
+pub mod ssh;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
     dotenv().ok();
 
+    let http_server = run_http_server();
+    let ssh_server = ssh::run_server();
+
+    tokio::try_join!(http_server, ssh_server)?;
+
+    Ok(())
+}
+
+async fn run_http_server() -> Result<(), Box<dyn Error + Send + Sync>> {
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::memory:".to_string());
 
@@ -28,7 +38,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Embed the migrations directory into the binary.
     sqlx::migrate!().run(&pool).await?;
 
-    crate::crud::create_repository(&pool, "Test", None, "some-test-url").await?;
+    // crate::crud::create_repository(&pool, "Test", None, "some-test-url").await?;
 
     // Insert an example repo.
 
@@ -41,6 +51,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);
+
+    // Run the HTTP server and the SSH server.
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())

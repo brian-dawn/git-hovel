@@ -41,3 +41,10 @@ impl From<askama::Error> for HovelError {
         Self::InternalServerError(Box::new(e))
     }
 }
+
+impl From<russh::Error> for HovelError {
+    fn from(e: russh::Error) -> Self {
+        Self::InternalServerError(Box::new(e))
+    }
+}
+
