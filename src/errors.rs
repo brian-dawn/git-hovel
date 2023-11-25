@@ -34,3 +34,10 @@ impl From<sqlx::Error> for HovelError {
         Self::InternalServerError(Box::new(e))
     }
 }
+
+// Now for askama errors.
+impl From<askama::Error> for HovelError {
+    fn from(e: askama::Error) -> Self {
+        Self::InternalServerError(Box::new(e))
+    }
+}

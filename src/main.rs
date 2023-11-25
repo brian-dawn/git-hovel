@@ -1,5 +1,7 @@
+use askama::Template;
 use axum::{
     extract::{Path, State},
+    response::{Html, IntoResponse},
     routing::get,
     Router,
 };
@@ -52,17 +54,21 @@ struct RepositoryResponse {
     repositories: Vec<crud::Repository>,
 }
 
-async fn root(pool: State<sqlx::SqlitePool>) -> Result<String, HovelError> {
-    let repos = sqlx::query!(r#"SELECT id, name FROM repository"#,)
-        .fetch_all(&*pool)
-        .await?;
+#[derive(Template)]
+#[template(path = "index.html")]
+struct IndexTemplate {
+    repositories: Vec<crud::Repository>,
+}
 
-    let mut html = String::new();
-    for repo in repos {
-        html.push_str(&format!("<li>{} - {}</li>", repo.id, repo.name));
-    }
+async fn root(pool: State<sqlx::SqlitePool>) -> Result<Html<String>, HovelError> {
+    // Load the askama template...
+    let index_template = IndexTemplate {
+        repositories: crud::list_repositories(&pool).await?,
+    };
 
-    Ok(html)
+    let rendered = index_template.render()?;
+
+    Ok(Html(rendered))
 }
 
 async fn repositories_json(
