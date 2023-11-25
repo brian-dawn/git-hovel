@@ -1,7 +1,21 @@
--- Create the repository table via sqlite.
 CREATE TABLE IF NOT EXISTS repository (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
     slug TEXT NOT NULL UNIQUE
 );
+
+CREATE TABLE IF NOT EXISTS user (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_keys(
+    id TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL UNIQUE,
+    FOREIGN KEY(user_id) REFERENCES user(id)
+);
+
+

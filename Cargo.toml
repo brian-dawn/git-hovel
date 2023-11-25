@@ -17,6 +17,6 @@ sqlx = { version = "0.7", features = [ "runtime-tokio", "sqlite", "uuid" ] }
 dotenv = "0.15.0"
 thiserror = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
-russh = "0.39.0"
+russh = { version = "0.39.0", features = ["openssl"] }
 async-trait = "0.1.74"
 russh-keys = "0.38.0"

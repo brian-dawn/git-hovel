@@ -13,10 +13,7 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Sync + Send>
     let keypair = russh_keys::key::KeyPair::generate_ed25519();
 
     let config = russh::server::Config {
-        inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
-        auth_rejection_time: std::time::Duration::from_secs(3),
-        auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
-
+        methods: MethodSet::PUBLICKEY,
         keys: vec![keypair.unwrap()],
         ..Default::default()
     };
@@ -25,6 +22,9 @@ pub async fn run_server() -> Result<(), Box<dyn std::error::Error + Sync + Send>
         clients: Arc::new(Mutex::new(HashMap::new())),
         id: 0,
     };
+
+    tracing::info!("Starting SSH server on port 2222");
+
     russh::server::run(config, ("0.0.0.0", 2222), sh).await?;
 
     Ok(())
@@ -68,16 +68,33 @@ impl server::Handler for Server {
         {
             let mut clients = self.clients.lock().await;
             clients.insert((self.id, channel.id()), session.handle());
+            tracing::info!("New client: {}", self.id);
         }
         Ok((self, true, session))
     }
 
+    async fn auth_publickey_offered(
+        self,
+        user: &str,
+        public_key: &key::PublicKey,
+    ) -> Result<(Self, server::Auth), Self::Error> {
+
+        let first_chars = public_key.fingerprint();
+        tracing::info!("Authenticating offered with public key {} for user {}", first_chars, user);
+        Ok((self, server::Auth::Accept))
+    }
     async fn auth_publickey(
         self,
         _: &str,
         _: &key::PublicKey,
     ) -> Result<(Self, server::Auth), Self::Error> {
+        tracing::info!("Authenticating with public key");
         Ok((self, server::Auth::Accept))
+    }
+
+    async fn auth_password(self, _: &str, _: &str) -> Result<(Self, server::Auth), Self::Error> {
+        tracing::info!("Rejecting authentication with password");
+        Ok((self, server::Auth::UnsupportedMethod))
     }
 
     async fn data(
@@ -88,7 +105,10 @@ impl server::Handler for Server {
     ) -> Result<(Self, Session), Self::Error> {
         let data = CryptoVec::from(format!("Got data: {}\r\n", String::from_utf8_lossy(data)));
         self.post(data.clone()).await;
+
+        tracing::info!("Got data: {}", String::from_utf8_lossy(data.as_ref()));
         session.data(channel, data);
+
         Ok((self, session))
     }
 
@@ -102,6 +122,7 @@ impl server::Handler for Server {
         let address = address.to_string();
         let port = *port;
         tokio::spawn(async move {
+            tracing::info!("Forwarding TCP/IP: {}:{}", address, port);
             let mut channel = handle
                 .channel_open_forwarded_tcpip(address, port, "1.2.3.4", 1234)
                 .await
@@ -109,6 +130,7 @@ impl server::Handler for Server {
             let _ = channel.data(&b"Hello from a forwarded port"[..]).await;
             let _ = channel.eof().await;
         });
+
         Ok((self, true, session))
     }
 }
