@@ -1,5 +1,10 @@
-use axum::{extract::State, routing::get, Router};
+use axum::{
+    extract::{Path, State},
+    routing::get,
+    Router,
+};
 use dotenv::dotenv;
+
 use errors::HovelError;
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +33,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
-        .route("/repositories.json", get(repositories_json))
+        .route("/api/repositories", get(repositories_json))
+        .route("/api/repositories/:id", get(repositories_json_fetch))
         .with_state(pool);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -70,4 +76,14 @@ async fn repositories_json(
 
     // Return json response
     Ok(axum::response::Json(response))
+}
+
+async fn repositories_json_fetch(
+    pool: State<sqlx::SqlitePool>,
+    Path(id): Path<sqlx::types::Uuid>,
+) -> Result<axum::response::Json<crud::Repository>, HovelError> {
+    let repository = crud::fetch_repository(&pool, &id).await?;
+
+    // Return json response
+    Ok(axum::response::Json(repository))
 }

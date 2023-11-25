@@ -53,7 +53,6 @@ pub async fn create_repository(
     Ok(found)
 }
 
-
 pub async fn list_repositories(pool: &SqlitePool) -> Result<Vec<Repository>, HovelError> {
     let repos = sqlx::query_as!(
         Repository,
@@ -66,4 +65,20 @@ pub async fn list_repositories(pool: &SqlitePool) -> Result<Vec<Repository>, Hov
     .await?;
 
     Ok(repos)
+}
+
+pub async fn fetch_repository(pool: &SqlitePool, id: &Uuid) -> Result<Repository, HovelError> {
+    let found = sqlx::query_as!(
+        Repository,
+        r#"
+        SELECT id as "id: Uuid", name, description, slug
+        FROM repository
+        WHERE id = ?
+        "#,
+        id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(found)
 }
